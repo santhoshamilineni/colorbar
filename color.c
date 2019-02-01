@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #define NUM_COLORS 8
-
+#define NUM_FORMATS 5
 enum FORMAT{
     ARGB32,
     RGB24,
@@ -17,7 +17,8 @@ enum FORMAT{
 
 struct color_bar_map
 {
-    char format[10];
+    char format_name[10];
+    uint8_t format;
     uint8_t Bpp;
     uint64_t colors[NUM_COLORS];
 };
@@ -26,7 +27,8 @@ struct color_bar_map
 struct color_bar_map color_list[] = {
     {   
         /*ARGB8888 BPP=4 */
-        .format = "argb32",
+        .format_name = "argb32",
+        .format = ARGB32,
         .Bpp = 4,
         .colors = {  
             0xFFFFFFFF, /* white */
@@ -41,7 +43,8 @@ struct color_bar_map color_list[] = {
     },
     {   
         /*RGB888 BPP =3 */
-        .format = "rgb24",
+        .format_name = "rgb24",
+        .format = RGB24,
         .Bpp = 3,
         .colors = {  
             0xFFFFFF, /* white */
@@ -56,7 +59,8 @@ struct color_bar_map color_list[] = {
     },
     {   
         /*RGB565 BPP =2 */
-        .format = "rgb565",
+        .format_name = "rgb565",
+        .format = RGB565,
         .Bpp = 2,
         .colors = {  
             0xffff, /* white */
@@ -71,7 +75,8 @@ struct color_bar_map color_list[] = {
     },
     {   
         /* YUV444P,BPP=3  packed no wastage*/
-        .format = "yuv444p",
+        .format_name = "yuv444p",
+        .format = YUV444P,
         .Bpp = 3,
         .colors = {  
             0x807fff, /* white */
@@ -86,7 +91,8 @@ struct color_bar_map color_list[] = {
     },
     {   
         /* YUV444,BPP=4  packed no wastage*/
-        .format = "yuv444",
+        .format_name = "yuv444",
+        .format = YUV444,
         .Bpp = 4,
         .colors = {  
             0x807fff, /* white */
@@ -145,20 +151,65 @@ int allocate_fb(uint32_t xres,uint32_t yres,uint8_t Bpp,void **buffer)
     return 0;
 }
 
-int main(void)
+void prinf_help() {
+        printf(" $color --help \n"); 
+        printf(" $color Xres Yres Colours Format \n"); 
+        printf(" -- Colours : 0 -8 \n");
+        printf(" -- Format : argb32,rgb24,rgb565,yuv444P,yuv444 \n");
+        printf("Ex: $ color 640 480 8 RBB24 ## Generate colour patern Res: 640 x 480 , 8 colours, format RGB888 \n");
+}
+
+int main(int argc,char **argv)
 {
     void *fb=NULL;
+    uint8_t format;
+    uint32_t xres;
+    uint32_t yres;
+    uint8_t num_colours;
 
-    uint8_t format=RGB565;
-    uint32_t xres=640;
-    uint32_t yres=480;
 
-    allocate_fb(xres,yres,color_list[format].Bpp,&fb);
-    gen_color_bar(xres,yres,color_list[format].colors,color_list[format].Bpp,8,fb);
+    if(argc==2 && strcmp(argv[1],"--help") == 0) 
+    {
+        prinf_help();
+        return 0;
+    }
+    
+    if(argc <= 4) {
+        printf("Invalid arguments...! \n$color --help\n");
+        return -1;
+    }
+    
+    xres = atoi(argv[1]);
+    yres = atoi(argv[2]);
+    num_colours = atoi(argv[3]);
+
+
+    uint8_t fmt_detected_flag=0;
+
+    for(int i=0;i<NUM_FORMATS;i++)
+    {
+        if(strcmp(argv[4],color_list[i].format_name) == 0) 
+        {
+            format= color_list[i].format;
+            fmt_detected_flag=1;
+            break;
+        }
+    }
+
+    if(fmt_detected_flag ==0 )
+    {
+        printf("Wrong format \n");
+        return 0;
+    }
+
     
 
-    char name[10] ;
-    sprintf(name,"frm.%s",color_list[format].format);
+    allocate_fb(xres,yres,color_list[format].Bpp,&fb);
+    gen_color_bar(xres,yres,color_list[format].colors,color_list[format].Bpp,num_colours,fb);
+    
+
+    char name[20] ;
+    sprintf(name,"frm_%dx%d_%dC.%s",xres,yres,num_colours,color_list[format].format_name);
     FILE *fp = fopen(name,"wb");
     fwrite(fb,(xres *  yres * color_list[format].Bpp),1 ,fp);
     fclose(fp);
